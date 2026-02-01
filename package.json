@@ -1,8 +1,16 @@
 {
   "name": "codex-usage",
-  "module": "index.ts",
+  "version": "0.0.0",
+  "module": "src/cli.ts",
   "type": "module",
   "private": true,
+  "bin": {
+    "codex-usage": "src/cli.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "codex-usage": "bun ./src/cli.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

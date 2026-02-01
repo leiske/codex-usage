@@ -1,6 +1,6 @@
-# ChatGPT Pro Usage CLI (Unofficial) - Implementation Plan
+# Codex Usage CLI (Unofficial) - Implementation Plan
 
-Goal: a Bun-only CLI that imports a browser "Copy as cURL" request for `https://chatgpt.com/backend-api/wham/usage`, securely stores the auth material, fetches the JSON, and prints two usage bars matching the UI semantics:
+Goal: a Bun-only CLI (`codex-usage`) that imports a browser "Copy as cURL" request for `https://chatgpt.com/backend-api/wham/usage`, securely stores the auth material, fetches the JSON, and prints two usage bars matching the UI semantics:
 - 5-hour window: `rate_limit.primary_window.used_percent`
 - weekly window: `rate_limit.secondary_window.used_percent`
 
@@ -17,13 +17,13 @@ Tracer-bullet philosophy:
 ## Phase 0 - Repo Bootstrap (Day 0)
 
 Deliverables:
-- `bun.lockb` + `package.json` (or Bun equivalent) with a single executable entrypoint.
+- `bun.lock`/`bun.lockb` + `package.json` (or Bun equivalent) with a single executable entrypoint.
 - `src/` layout with a minimal CLI skeleton.
 - `bun test` wired up.
 
 Acceptance criteria:
 - `bun test` runs and passes.
-- `bun run ./src/cli.ts --help` (or `bun run chatgpt-usage --help`) prints usage.
+- `bun run ./src/cli.ts --help` (or `bun run codex-usage -- --help`) prints usage.
 
 Verification:
 - Add a trivial unit test (e.g., bar rendering with 0% and 100%).
@@ -36,19 +36,19 @@ Purpose:
 Implementation:
 - Implement `src/fetchUsage.ts` that calls the endpoint using:
   - `CHATGPT_WHAM_URL` (default to `https://chatgpt.com/backend-api/wham/usage`)
-  - `CHATGPT_COOKIE` (string)
   - `CHATGPT_AUTHORIZATION` (e.g. `Bearer ...`)
+  - `CHATGPT_COOKIE` (optional; string)
 - Implement `src/renderBars.ts` that takes the parsed JSON and prints two bars.
 
 CLI:
-- `chatgpt-usage run` uses env vars and prints bars.
+- `codex-usage run` uses env vars and prints bars.
 
 Acceptance criteria:
-- With valid env vars, `chatgpt-usage run` prints:
+- With valid env vars, `codex-usage run` prints:
   - two labeled bars
   - percent values from the response
   - human-readable reset times using `reset_after_seconds`
-- With missing env vars, prints actionable error.
+- With missing required env vars, prints actionable error.
 - With `401/403`, prints "auth expired; run import again".
 
 Tests:
@@ -60,7 +60,7 @@ Tests:
   - feed sample JSON and verify output contains expected percents.
 
 Manual verification:
-- Temporarily set env vars from a known-good cURL and run `chatgpt-usage run`.
+- Temporarily set env vars from a known-good cURL and run `codex-usage run`.
 
 ## Phase 2 - cURL Import (Parser) + Minimal Persistence (Unsafe File)
 
@@ -83,12 +83,12 @@ Implementation:
   - plus `cookie` (from `-b`)
 
 CLI:
-- `chatgpt-usage import` reads stdin and writes `~/.config/chatgpt-usage/auth.json` with `0600` perms.
-- `chatgpt-usage` (default) loads this file and runs.
+- `codex-usage import` reads stdin and writes `~/.config/codex-usage/auth.json` with `0600` perms.
+- `codex-usage` (default) loads this file and runs.
 
 Acceptance criteria:
-- `chatgpt-usage import < curl.txt` succeeds and stores a normalized JSON blob.
-- `chatgpt-usage` fetches and prints bars using stored data.
+- `codex-usage import < curl.txt` succeeds and stores a normalized JSON blob.
+- `codex-usage` fetches and prints bars using stored data.
 - Secrets are never echoed; logging is redacted.
 
 Tests:
@@ -122,16 +122,16 @@ Implementation:
   - `set(blob: AuthBlob): Promise<void>`
   - `clear(): Promise<void>`
 - `src/store/secretToolStore.ts` uses `Bun.spawn` to run:
-  - `secret-tool store --label=... service chatgpt-usage account default`
-  - `secret-tool lookup service chatgpt-usage account default`
-  - `secret-tool clear service chatgpt-usage account default` (or equivalent)
-- `src/store/passStore.ts` uses `pass` entry `chatgpt-usage/default`.
+  - `secret-tool store --label=... service codex-usage account default`
+  - `secret-tool lookup service codex-usage account default`
+  - `secret-tool clear service codex-usage account default` (or equivalent)
+- `src/store/passStore.ts` uses `pass` entry `codex-usage/default`.
 - `src/store/fileStore.ts` remains as fallback.
 
 CLI:
-- `chatgpt-usage import` stores via best available backend.
-- `chatgpt-usage store status` prints which backend is active (no secrets).
-- `chatgpt-usage logout` clears stored secret.
+- `codex-usage import` stores via best available backend.
+- `codex-usage store status` prints which backend is active (no secrets).
+- `codex-usage logout` clears stored secret.
 
 Acceptance criteria:
 - On a machine with `secret-tool`, `import` uses it.
@@ -156,7 +156,7 @@ Implementation:
   - 1 fast attempt, no retries by default.
   - Optional `--retry 2` for flaky 5xx.
 - `401/403`:
-  - print a single-line instruction: "Auth expired. Re-run: chatgpt-usage import"
+  - print a single-line instruction: "Auth expired. Re-run: codex-usage import"
   - optionally offer `--debug` to show status code and which headers were sent (names only).
 - Redaction:
   - any debug printing must redact `cookie`, `authorization`.
@@ -245,7 +245,7 @@ Store exactly what is needed to replay the request:
 ## MVP Acceptance Test (End-to-End)
 
 1) User copies the request as cURL from DevTools.
-2) `cat curl.txt | chatgpt-usage import`
-3) `chatgpt-usage`
+2) `cat curl.txt | codex-usage import`
+3) `codex-usage`
 4) Output contains both bars with correct percents and reset times.
-5) After invalidating session, `chatgpt-usage` shows a single-line re-import instruction.
+5) After invalidating session, `codex-usage` shows a single-line re-import instruction.
