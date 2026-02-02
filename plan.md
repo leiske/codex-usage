@@ -41,10 +41,10 @@ Implementation:
 - Implement `src/renderBars.ts` that takes the parsed JSON and prints two bars.
 
 CLI:
-- `codex-usage run` uses env vars and prints bars.
+- `codex-usage` uses stored auth when available; otherwise falls back to env vars and prints bars.
 
 Acceptance criteria:
-- With valid env vars, `codex-usage run` prints:
+- With valid env vars, `codex-usage` prints:
   - two labeled bars
   - percent values from the response
   - human-readable reset times using `reset_after_seconds`
@@ -60,7 +60,7 @@ Tests:
   - feed sample JSON and verify output contains expected percents.
 
 Manual verification:
-- Temporarily set env vars from a known-good cURL and run `codex-usage run`.
+- Temporarily set env vars from a known-good cURL and run `codex-usage`.
 
 ## Phase 2 - cURL Import (Parser) + Minimal Persistence (Unsafe File)
 
@@ -84,7 +84,7 @@ Implementation:
 
 CLI:
 - `codex-usage import` reads stdin and writes `~/.config/codex-usage/auth.json` with `0600` perms.
-- `codex-usage` (default) loads this file and runs.
+- `codex-usage` (default) loads stored auth and runs (falls back to env vars if no stored auth).
 
 Acceptance criteria:
 - `codex-usage import < curl.txt` succeeds and stores a normalized JSON blob.
@@ -130,7 +130,7 @@ Implementation:
 
 CLI:
 - `codex-usage import` stores via best available backend.
-- `codex-usage store status` prints which backend is active (no secrets).
+- `codex-usage status` prints which backend is active (no secrets).
 - `codex-usage logout` clears stored secret.
 
 Acceptance criteria:

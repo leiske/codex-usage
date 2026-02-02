@@ -18,7 +18,7 @@ Storage:
 - File fallback path: `~/.config/codex-usage/auth.json` (chmod 600).
 
 Useful commands:
-- `codex-usage store status`
+- `codex-usage status`
 - `codex-usage logout`
 
 This project was created using `bun init` in bun v1.3.4. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.

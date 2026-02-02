@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { runCommandWithErrors } from "./commands/run";
 import { importCommandWithErrors } from "./commands/import";
 import { runStoredCommandWithErrors } from "./commands/runStored";
 import { storeStatusCommandWithErrors } from "./commands/storeStatus";
@@ -13,16 +12,15 @@ function helpText(): string {
     "Usage:",
     "  codex-usage --help",
     "  codex-usage --version",
-    "  codex-usage                # run using stored auth (Phase 2)",
+    "  codex-usage                # run (stored auth preferred; env fallback)",
     "  codex-usage import          # read cURL from stdin and store auth",
-    "  codex-usage run             # run using env vars (Phase 1 helper)",
-    "  codex-usage store status    # show active storage backend",
+    "  codex-usage status          # show active storage backend",
     "  codex-usage logout          # clear stored auth",
     "",
     "Examples:",
     "  cat curl.txt | codex-usage import",
     "  codex-usage",
-    "  CHATGPT_AUTHORIZATION=... [CHATGPT_COOKIE=...] codex-usage run",
+    "  CHATGPT_AUTHORIZATION=... [CHATGPT_COOKIE=...] codex-usage",
     "",
     "Dev helpers:",
     "  bun run ./src/cli.ts --help",
@@ -30,23 +28,22 @@ function helpText(): string {
   ].join("\n");
 }
 
-function parseArgs(argv: string[]): { cmd: string | null; rest: string[]; flags: Set<string> } {
+function parseArgs(argv: string[]): { cmd: string | null; flags: Set<string> } {
   const flags = new Set<string>();
-  const positionals: string[] = [];
+  let cmd: string | null = null;
 
   for (const a of argv) {
     if (a === "--help" || a === "-h") flags.add("help");
     else if (a === "--version" || a === "-v") flags.add("version");
-    else if (!a.startsWith("-")) positionals.push(a);
+    else if (!a.startsWith("-") && cmd === null) cmd = a;
   }
 
-  return { cmd: positionals[0] ?? null, rest: positionals.slice(1), flags };
+  return { cmd, flags };
 }
 
 const argv = Bun.argv.slice(2);
 const parsed = parseArgs(argv);
 const { cmd, flags } = parsed;
-const rest = parsed.rest;
 
 if (flags.has("version")) {
   const pkg = (await Bun.file(new URL("../package.json", import.meta.url)).json()) as {
@@ -76,7 +73,7 @@ if (cmd === "import") {
   process.exit(result.exitCode);
 }
 
-if (cmd === "store" && rest[0] === "status") {
+if (cmd === "status") {
   const result = await storeStatusCommandWithErrors();
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
@@ -85,13 +82,6 @@ if (cmd === "store" && rest[0] === "status") {
 
 if (cmd === "logout") {
   const result = await logoutCommandWithErrors();
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
-  process.exit(result.exitCode);
-}
-
-if (cmd === "run") {
-  const result = await runCommandWithErrors();
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
   process.exit(result.exitCode);

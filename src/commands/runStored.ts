@@ -1,6 +1,7 @@
 import { AuthExpiredError } from "../errors";
 import { fetchUsage, type FetchFn } from "../fetchUsage";
 import { renderBars } from "../renderBars";
+import { runCommandWithErrors } from "./run";
 import type { Store } from "../store/Store";
 import { getDefaultStores } from "../store/defaultStores";
 import { getFirstAuth } from "../store/selectStore";
@@ -22,11 +23,8 @@ export async function runStoredCommandWithErrors(options: RunStoredOptions = {})
     const stores = options.stores ?? getDefaultStores();
     const selected = await getFirstAuth(stores);
     if (!selected) {
-      return {
-        exitCode: 1,
-        stdout: "",
-        stderr: "No stored auth. Run: codex-usage import < curl.txt\n",
-      };
+      // Fallback to env vars (Phase 1 path) so the top-level command is the only one.
+      return await runCommandWithErrors({ fetchFn: options.fetchFn, barWidth: options.barWidth });
     }
 
     const blob = selected.blob;
