@@ -44,7 +44,7 @@ export async function runCommandWithErrors(options: RunOptions = {}): Promise<Ru
         exitCode: 1,
         stdout: "",
         stderr:
-          "Missing env vars. Set these from a DevTools 'Copy as cURL' request:\n" +
+          "Missing env vars. Either set these from DevTools 'Copy as cURL' or run: codex-usage import\n" +
           `  ${err.missing.join("\n  ")}\n`,
       };
     }

@@ -6,6 +6,7 @@ export type FetchUsageOptions = {
   url: string;
   cookie?: string;
   authorization: string;
+  headers?: Record<string, string>;
   fetchFn?: FetchFn;
   timeoutMs?: number;
 };
@@ -20,6 +21,7 @@ export async function fetchUsage(options: FetchUsageOptions): Promise<unknown> {
   try {
     const headers: Record<string, string> = {
       accept: "application/json",
+      ...(options.headers ?? {}),
       authorization: options.authorization,
     };
     if (options.cookie && options.cookie.trim() !== "") headers.cookie = options.cookie;

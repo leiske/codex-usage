@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 
 import { runCommandWithErrors } from "./commands/run";
+import { importCommandWithErrors } from "./commands/import";
+import { runStoredCommandWithErrors } from "./commands/runStored";
 
 function helpText(): string {
   return [
@@ -9,9 +11,13 @@ function helpText(): string {
     "Usage:",
     "  codex-usage --help",
     "  codex-usage --version",
-    "  codex-usage run   # requires env vars (Phase 1)",
+    "  codex-usage                # run using stored auth (Phase 2)",
+    "  codex-usage import          # read cURL from stdin and store auth",
+    "  codex-usage run             # run using env vars (Phase 1 helper)",
     "",
-    "Phase 1: fetches usage using env vars.",
+    "Examples:",
+    "  cat curl.txt | codex-usage import",
+    "  codex-usage",
     "  CHATGPT_AUTHORIZATION=... [CHATGPT_COOKIE=...] codex-usage run",
     "",
     "Dev helpers:",
@@ -44,10 +50,24 @@ if (flags.has("version")) {
   process.exit(0);
 }
 
-if (flags.has("help") || cmd === null) {
+if (flags.has("help")) {
   process.stdout.write(helpText());
   process.stdout.write("\n");
   process.exit(0);
+}
+
+if (cmd === null) {
+  const result = await runStoredCommandWithErrors();
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  process.exit(result.exitCode);
+}
+
+if (cmd === "import") {
+  const result = await importCommandWithErrors();
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  process.exit(result.exitCode);
 }
 
 if (cmd === "run") {
