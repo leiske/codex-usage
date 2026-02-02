@@ -1,7 +1,10 @@
 import type { AuthBlob } from "../auth/AuthBlob";
 import { filterAllowedHeaders } from "../auth/allowlist";
 import { parseCurl } from "../curl/parseCurl";
-import { fileStoreSet, getDefaultAuthPath, type FileStoreOptions } from "../store/fileStore";
+import type { Store } from "../store/Store";
+import { getDefaultAuthPath, type FileStoreOptions } from "../store/fileStore";
+import { getDefaultStores } from "../store/defaultStores";
+import { setWithFallback } from "../store/selectStore";
 
 export type ImportResult = {
   exitCode: number;
@@ -11,7 +14,10 @@ export type ImportResult = {
 
 export type ImportOptions = {
   input?: string;
-  store?: FileStoreOptions;
+  // For Phase 2 tests: allow overriding file path/env.
+  file?: FileStoreOptions;
+  // For Phase 3 tests: allow injecting store list.
+  stores?: Store[];
 };
 
 function nowSeconds(): number {
@@ -52,16 +58,21 @@ export async function importCommandWithErrors(options: ImportOptions = {}): Prom
       imported_at: nowSeconds(),
     };
 
-    await fileStoreSet(blob, options.store);
+    const stores = options.stores ?? getDefaultStores(options.file);
+    const set = await setWithFallback(stores, blob);
 
-    const env = options.store?.env ?? (Bun.env as Record<string, string | undefined>);
-    const path = options.store?.authPath ?? getDefaultAuthPath(env);
+    const env = options.file?.env ?? (Bun.env as Record<string, string | undefined>);
+    const path = options.file?.authPath ?? getDefaultAuthPath(env);
+    const storedWhere = set.store.kind === "file" ? path : set.store.label;
+    const fallbackNote = set.usedFallback ? " (fallback)" : "";
 
     return {
       exitCode: 0,
-      stdout: `Imported auth to ${path} (${describeStored(blob)})\n`,
+      stdout: `Imported auth to ${storedWhere}${fallbackNote} (${describeStored(blob)})\n`,
       stderr:
-        "WARNING: auth is stored unencrypted on disk. Treat it like a password.\n",
+        set.store.kind === "file"
+          ? "WARNING: auth is stored unencrypted on disk. Treat it like a password.\n"
+          : "",
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

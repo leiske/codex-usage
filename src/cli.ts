@@ -3,6 +3,8 @@
 import { runCommandWithErrors } from "./commands/run";
 import { importCommandWithErrors } from "./commands/import";
 import { runStoredCommandWithErrors } from "./commands/runStored";
+import { storeStatusCommandWithErrors } from "./commands/storeStatus";
+import { logoutCommandWithErrors } from "./commands/logout";
 
 function helpText(): string {
   return [
@@ -14,6 +16,8 @@ function helpText(): string {
     "  codex-usage                # run using stored auth (Phase 2)",
     "  codex-usage import          # read cURL from stdin and store auth",
     "  codex-usage run             # run using env vars (Phase 1 helper)",
+    "  codex-usage store status    # show active storage backend",
+    "  codex-usage logout          # clear stored auth",
     "",
     "Examples:",
     "  cat curl.txt | codex-usage import",
@@ -26,21 +30,23 @@ function helpText(): string {
   ].join("\n");
 }
 
-function parseArgs(argv: string[]): { cmd: string | null; flags: Set<string> } {
+function parseArgs(argv: string[]): { cmd: string | null; rest: string[]; flags: Set<string> } {
   const flags = new Set<string>();
-  let cmd: string | null = null;
+  const positionals: string[] = [];
 
   for (const a of argv) {
     if (a === "--help" || a === "-h") flags.add("help");
     else if (a === "--version" || a === "-v") flags.add("version");
-    else if (!a.startsWith("-") && cmd === null) cmd = a;
+    else if (!a.startsWith("-")) positionals.push(a);
   }
 
-  return { cmd, flags };
+  return { cmd: positionals[0] ?? null, rest: positionals.slice(1), flags };
 }
 
 const argv = Bun.argv.slice(2);
-const { cmd, flags } = parseArgs(argv);
+const parsed = parseArgs(argv);
+const { cmd, flags } = parsed;
+const rest = parsed.rest;
 
 if (flags.has("version")) {
   const pkg = (await Bun.file(new URL("../package.json", import.meta.url)).json()) as {
@@ -65,6 +71,20 @@ if (cmd === null) {
 
 if (cmd === "import") {
   const result = await importCommandWithErrors();
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  process.exit(result.exitCode);
+}
+
+if (cmd === "store" && rest[0] === "status") {
+  const result = await storeStatusCommandWithErrors();
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  process.exit(result.exitCode);
+}
+
+if (cmd === "logout") {
+  const result = await logoutCommandWithErrors();
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
   process.exit(result.exitCode);

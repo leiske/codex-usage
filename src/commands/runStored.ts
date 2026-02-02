@@ -1,7 +1,9 @@
 import { AuthExpiredError } from "../errors";
 import { fetchUsage, type FetchFn } from "../fetchUsage";
 import { renderBars } from "../renderBars";
-import { fileStoreGet, type FileStoreOptions } from "../store/fileStore";
+import type { Store } from "../store/Store";
+import { getDefaultStores } from "../store/defaultStores";
+import { getFirstAuth } from "../store/selectStore";
 
 export type RunStoredResult = {
   exitCode: number;
@@ -12,19 +14,22 @@ export type RunStoredResult = {
 export type RunStoredOptions = {
   fetchFn?: FetchFn;
   barWidth?: number;
-  store?: FileStoreOptions;
+  stores?: Store[];
 };
 
 export async function runStoredCommandWithErrors(options: RunStoredOptions = {}): Promise<RunStoredResult> {
   try {
-    const blob = await fileStoreGet(options.store);
-    if (!blob) {
+    const stores = options.stores ?? getDefaultStores();
+    const selected = await getFirstAuth(stores);
+    if (!selected) {
       return {
         exitCode: 1,
         stdout: "",
         stderr: "No stored auth. Run: codex-usage import < curl.txt\n",
       };
     }
+
+    const blob = selected.blob;
 
     const authorization = blob.headers.authorization;
     if (!authorization) {

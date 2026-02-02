@@ -6,13 +6,19 @@ To install dependencies:
 bun install
 ```
 
-To run (Phase 2):
+To run (Phase 2/3):
 
 ```bash
 cat curl.txt | bun run ./src/cli.ts import
 bun run ./src/cli.ts
 ```
 
-Security note: Phase 2 stores auth unencrypted at `~/.config/codex-usage/auth.json` (chmod 600). Treat it like a password.
+Storage:
+- Phase 3 will prefer OS keychain (`secret-tool`), then `pass`, then an unencrypted file fallback.
+- File fallback path: `~/.config/codex-usage/auth.json` (chmod 600).
+
+Useful commands:
+- `codex-usage store status`
+- `codex-usage logout`
 
 This project was created using `bun init` in bun v1.3.4. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.

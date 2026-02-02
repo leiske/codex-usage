@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { importCommandWithErrors } from "../src/commands/import";
 import { runStoredCommandWithErrors } from "../src/commands/runStored";
+import { fileStore } from "../src/store/fileStoreAdapter";
 
 function tempAuthPath(): string {
   const id = crypto.randomUUID();
@@ -22,7 +23,8 @@ describe("import + default run", () => {
 
     const imp = await importCommandWithErrors({
       input: curl,
-      store: { authPath },
+      file: { authPath },
+      stores: [fileStore({ authPath })],
     });
 
     expect(imp.exitCode).toBe(0);
@@ -51,7 +53,7 @@ describe("import + default run", () => {
     const run = await runStoredCommandWithErrors({
       fetchFn: fetchFn as any,
       barWidth: 10,
-      store: { authPath },
+      stores: [fileStore({ authPath })],
     });
 
     expect(run.exitCode).toBe(0);

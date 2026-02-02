@@ -58,3 +58,10 @@ export async function fileStoreSet(blob: AuthBlob, options: FileStoreOptions = {
   await Bun.write(authPath, json);
   await chmod600(authPath);
 }
+
+export async function fileStoreClear(options: FileStoreOptions = {}): Promise<void> {
+  const env = options.env ?? (Bun.env as Record<string, string | undefined>);
+  const authPath = options.authPath ?? getDefaultAuthPath(env);
+  const proc = Bun.spawn(["rm", "-f", authPath], { stdout: "ignore", stderr: "ignore" });
+  await proc.exited;
+}
