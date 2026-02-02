@@ -1,6 +1,8 @@
 import { UnexpectedResponseError } from "./errors";
 import { formatDuration } from "./time/formatDuration";
+import { formatLocalTimestamp } from "./time/formatLocalTimestamp";
 import { clampPercent, renderBar } from "./ui/bar";
+import { computeBarWidth } from "./ui/terminal";
 
 type WindowLike = {
   used_percent?: unknown;
@@ -23,10 +25,17 @@ function getWindow(data: unknown, key: "primary_window" | "secondary_window"): W
 
 export type RenderBarsOptions = {
   width?: number;
+  columns?: number | null;
+  verbose?: boolean;
+  nowMs?: number;
 };
 
 export function renderBars(data: unknown, options: RenderBarsOptions = {}): string {
-  const width = options.width ?? 24;
+  const preferred = options.width ?? 24;
+  const columns = options.columns ?? null;
+  const width = computeBarWidth(columns, preferred);
+  const verbose = options.verbose ?? false;
+  const nowMs = options.nowMs ?? Date.now();
 
   const primary = getWindow(data, "primary_window");
   const secondary = getWindow(data, "secondary_window");
@@ -48,18 +57,32 @@ export function renderBars(data: unknown, options: RenderBarsOptions = {}): stri
   }
 
   const lines = [
-    renderLine("5-hour", pUsed, pReset, width),
-    renderLine("Weekly", sUsed, sReset, width),
+    renderLine("5-hour", pUsed, pReset, width, { verbose, nowMs, columns }),
+    renderLine("Weekly", sUsed, sReset, width, { verbose, nowMs, columns }),
   ];
 
   return lines.join("\n");
 }
 
-function renderLine(label: string, usedPercent: number, resetAfterSeconds: number, width: number): string {
+function renderLine(
+  label: string,
+  usedPercent: number,
+  resetAfterSeconds: number,
+  width: number,
+  extra: { verbose: boolean; nowMs: number; columns: number | null },
+): string {
   const p = clampPercent(usedPercent);
   const pct = Math.round(p);
   const bar = renderBar(p, width);
   const resetIn = formatDuration(resetAfterSeconds);
   const padLabel = label.padEnd(6, " ");
-  return `${padLabel} ${bar} ${pct}% (resets in ${resetIn})`;
+
+  const suffix = extra.columns !== null && extra.columns < 60 ? `(${resetIn})` : `(resets in ${resetIn})`;
+  const base = `${padLabel} ${bar} ${pct}% ${suffix}`;
+  if (!extra.verbose) return base;
+
+  if (extra.columns !== null && extra.columns < 80) return base;
+
+  const resetAt = formatLocalTimestamp(extra.nowMs + Math.max(0, resetAfterSeconds) * 1000);
+  return `${base} (reset at ${resetAt})`;
 }

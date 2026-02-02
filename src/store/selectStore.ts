@@ -18,6 +18,7 @@ export async function getFirstAuth(stores: Store[]): Promise<SelectedAuth | null
 export type SetResult = {
   store: Store;
   usedFallback: boolean;
+  failures: Array<{ kind: Store["kind"]; message: string }>;
 };
 
 export async function setWithFallback(stores: Store[], blob: AuthBlob): Promise<SetResult> {
@@ -28,13 +29,16 @@ export async function setWithFallback(stores: Store[], blob: AuthBlob): Promise<
   if (available.length === 0) throw new Error("No available stores");
 
   const preferred = available[0]!;
+  const failures: Array<{ kind: Store["kind"]; message: string }> = [];
   for (let i = 0; i < available.length; i++) {
     const s = available[i]!;
     try {
       await s.set(blob);
-      return { store: s, usedFallback: i !== 0 };
-    } catch {
+      return { store: s, usedFallback: i !== 0, failures };
+    } catch (err) {
       // Try next store.
+      const msg = err instanceof Error ? err.message : String(err);
+      failures.push({ kind: s.kind, message: msg });
     }
   }
 

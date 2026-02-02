@@ -1,0 +1,11 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`renderBars formatting default formatting snapshot 1`] = `
+"5-hour [###---------------------] 12% (resets in 10m 20s)
+Weekly [########################] 98% (resets in 1d 1h)"
+`;
+
+exports[`renderBars formatting narrow terminal reduces bar width 1`] = `
+"5-hour [#####-----] 50% (1h)
+Weekly [#####-----] 50% (1h)"
+`;

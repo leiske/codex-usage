@@ -4,48 +4,49 @@ import { importCommandWithErrors } from "./commands/import";
 import { runStoredCommandWithErrors } from "./commands/runStored";
 import { storeStatusCommandWithErrors } from "./commands/storeStatus";
 import { logoutCommandWithErrors } from "./commands/logout";
+import { parseCliFlags } from "./cliFlags";
 
 function helpText(): string {
   return [
-    "codex-usage - ChatGPT usage bars (unofficial)",
+    "codex-usage - ChatGPT usage",
     "",
     "Usage:",
     "  codex-usage --help",
     "  codex-usage --version",
-    "  codex-usage                # run (stored auth preferred; env fallback)",
+    "  codex-usage                 # see usage",
     "  codex-usage import          # read cURL from stdin and store auth",
-    "  codex-usage status          # show active storage backend",
+    "  codex-usage status          # show active auth storage",
     "  codex-usage logout          # clear stored auth",
+    "",
+    "Flags:",
+    "  --retry N     retry on HTTP 5xx (default 0)",
+    "  --debug       show status + header names on errors",
+    "  --verbose     include reset timestamps",
     "",
     "Examples:",
     "  cat curl.txt | codex-usage import",
+    "  pbpaste | codex-usage import # macOS",
+    "  xclip -o | codex-usage import  # Linux",
     "  codex-usage",
     "  CHATGPT_AUTHORIZATION=... [CHATGPT_COOKIE=...] codex-usage",
-    "",
-    "Dev helpers:",
-    "  bun run ./src/cli.ts --help",
-    "  bun test",
   ].join("\n");
 }
 
-function parseArgs(argv: string[]): { cmd: string | null; flags: Set<string> } {
-  const flags = new Set<string>();
-  let cmd: string | null = null;
-
-  for (const a of argv) {
-    if (a === "--help" || a === "-h") flags.add("help");
-    else if (a === "--version" || a === "-v") flags.add("version");
-    else if (!a.startsWith("-") && cmd === null) cmd = a;
-  }
-
-  return { cmd, flags };
+const argv = Bun.argv.slice(2);
+let parsed: ReturnType<typeof parseCliFlags>;
+try {
+  parsed = parseCliFlags(argv);
+} catch (err) {
+  const msg = err instanceof Error ? err.message : String(err);
+  process.stderr.write(`Invalid args: ${msg}\n`);
+  process.stderr.write("Run: codex-usage --help\n");
+  process.exit(2);
 }
 
-const argv = Bun.argv.slice(2);
-const parsed = parseArgs(argv);
-const { cmd, flags } = parsed;
+const { flags, positionals } = parsed;
+const cmd = positionals[0] ?? null;
 
-if (flags.has("version")) {
+if (flags.version) {
   const pkg = (await Bun.file(new URL("../package.json", import.meta.url)).json()) as {
     version?: string;
   };
@@ -53,14 +54,18 @@ if (flags.has("version")) {
   process.exit(0);
 }
 
-if (flags.has("help")) {
+if (flags.help) {
   process.stdout.write(helpText());
   process.stdout.write("\n");
   process.exit(0);
 }
 
 if (cmd === null) {
-  const result = await runStoredCommandWithErrors();
+  const result = await runStoredCommandWithErrors({
+    retry: flags.retry,
+    debug: flags.debug,
+    verbose: flags.verbose,
+  });
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
   process.exit(result.exitCode);

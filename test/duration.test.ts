@@ -10,4 +10,9 @@ describe("formatDuration", () => {
   test("formats days and hours", () => {
     expect(formatDuration(90000)).toBe("1d 1h");
   });
+
+  test("formats 0/negative as 0s", () => {
+    expect(formatDuration(0)).toBe("0s");
+    expect(formatDuration(-1)).toBe("0s");
+  });
 });

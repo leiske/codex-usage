@@ -2,7 +2,7 @@ import type { AuthBlob } from "../auth/AuthBlob";
 import { filterAllowedHeaders } from "../auth/allowlist";
 import { parseCurl } from "../curl/parseCurl";
 import type { Store } from "../store/Store";
-import { getDefaultAuthPath, type FileStoreOptions } from "../store/fileStore";
+import type { FileStoreOptions } from "../store/fileStore";
 import { getDefaultStores } from "../store/defaultStores";
 import { setWithFallback } from "../store/selectStore";
 
@@ -22,12 +22,6 @@ export type ImportOptions = {
 
 function nowSeconds(): number {
   return Math.floor(Date.now() / 1000);
-}
-
-function describeStored(blob: AuthBlob): string {
-  const headerNames = Object.keys(blob.headers).sort();
-  const cookie = blob.cookie ? "yes" : "no";
-  return `headers=${headerNames.join(",")} cookie=${cookie}`;
 }
 
 export async function importCommandWithErrors(options: ImportOptions = {}): Promise<ImportResult> {
@@ -61,18 +55,15 @@ export async function importCommandWithErrors(options: ImportOptions = {}): Prom
     const stores = options.stores ?? getDefaultStores(options.file);
     const set = await setWithFallback(stores, blob);
 
-    const env = options.file?.env ?? (Bun.env as Record<string, string | undefined>);
-    const path = options.file?.authPath ?? getDefaultAuthPath(env);
-    const storedWhere = set.store.kind === "file" ? path : set.store.label;
-    const fallbackNote = set.usedFallback ? " (fallback)" : "";
+    const note =
+      set.store.kind === "file"
+        ? "NOTE: using file fallback (unencrypted). Treat it like a password.\n"
+        : "";
 
     return {
       exitCode: 0,
-      stdout: `Imported auth to ${storedWhere}${fallbackNote} (${describeStored(blob)})\n`,
-      stderr:
-        set.store.kind === "file"
-          ? "WARNING: auth is stored unencrypted on disk. Treat it like a password.\n"
-          : "",
+      stdout: "Auth imported. Run `codex-usage` to see the latest usage.\n",
+      stderr: note,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

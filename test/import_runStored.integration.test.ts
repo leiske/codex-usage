@@ -28,10 +28,9 @@ describe("import + default run", () => {
     });
 
     expect(imp.exitCode).toBe(0);
-    expect(imp.stderr).toContain("WARNING");
-    expect(imp.stdout).toContain("Imported auth");
-    expect(imp.stdout).toContain("authorization");
-    expect(imp.stdout).toContain("user-agent");
+    expect(imp.stdout).toContain("Auth imported");
+    expect(imp.stdout).toContain("codex-usage");
+    expect(imp.stderr).toContain("unencrypted");
     expect(imp.stdout).not.toContain("secret_token_value");
 
     const fetchFn = async (input: any, init?: any) => {
@@ -52,7 +51,7 @@ describe("import + default run", () => {
 
     const run = await runStoredCommandWithErrors({
       fetchFn: fetchFn as any,
-      barWidth: 10,
+      columns: 50,
       stores: [fileStore({ authPath })],
     });
 

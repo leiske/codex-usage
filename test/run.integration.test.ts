@@ -28,7 +28,7 @@ describe("runCommandWithErrors", () => {
         CHATGPT_AUTHORIZATION: authorization,
       },
       fetchFn: fetchFn as any,
-      barWidth: 10,
+      columns: 50,
     });
 
     expect(result.exitCode).toBe(0);
@@ -69,7 +69,7 @@ describe("runCommandWithErrors", () => {
         CHATGPT_AUTHORIZATION: "Bearer token",
       },
       fetchFn: fetchFn as any,
-      barWidth: 10,
+      columns: 50,
     });
 
     expect(result.exitCode).toBe(0);
@@ -88,12 +88,14 @@ describe("runCommandWithErrors", () => {
         CHATGPT_AUTHORIZATION: "Bearer t",
       },
       fetchFn: fetchFn as any,
+      debug: true,
     });
 
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("Auth expired");
     expect(result.stderr).toContain("codex-usage import");
+    expect(result.stderr).toContain("debug:");
   });
 
   test("prints actionable error on missing env", async () => {
@@ -101,5 +103,54 @@ describe("runCommandWithErrors", () => {
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("CHATGPT_AUTHORIZATION");
+  });
+
+  test("retries on HTTP 5xx when configured", async () => {
+    let calls = 0;
+    const fetchFn = async () => {
+      calls++;
+      if (calls === 1) return new Response("oops", { status: 500 });
+      return new Response(
+        JSON.stringify({
+          rate_limit: {
+            primary_window: { used_percent: 0, reset_after_seconds: 1 },
+            secondary_window: { used_percent: 0, reset_after_seconds: 1 },
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    };
+
+    const result = await runCommandWithErrors({
+      env: {
+        CHATGPT_WHAM_URL: "https://example.test/backend-api/wham/usage",
+        CHATGPT_AUTHORIZATION: "Bearer t",
+      },
+      fetchFn: fetchFn as any,
+      retry: 1,
+    });
+
+    expect(calls).toBe(2);
+    expect(result.exitCode).toBe(0);
+  });
+
+  test("prints clear message on unexpected JSON shape", async () => {
+    const fetchFn = async () => {
+      return new Response(JSON.stringify({ nope: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+
+    const result = await runCommandWithErrors({
+      env: {
+        CHATGPT_WHAM_URL: "https://example.test/backend-api/wham/usage",
+        CHATGPT_AUTHORIZATION: "Bearer t",
+      },
+      fetchFn: fetchFn as any,
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("Unexpected response shape");
   });
 });

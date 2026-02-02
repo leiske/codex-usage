@@ -19,13 +19,17 @@ export async function logoutCommandWithErrors(options: LogoutOptions = {}): Prom
     const stores = options.stores ?? getDefaultStores(options.file);
     const { cleared, failed } = await clearAllAvailable(stores);
 
-    const clearedKinds = cleared.map((s) => s.kind);
     const failedKinds = failed.map((s) => s.kind);
 
-    const parts: string[] = [];
-    parts.push(`Cleared: ${clearedKinds.length > 0 ? clearedKinds.join(", ") : "none"}`);
-    if (failedKinds.length > 0) parts.push(`Failed: ${failedKinds.join(", ")}`);
-    return { exitCode: failedKinds.length > 0 ? 1 : 0, stdout: parts.join("\n") + "\n", stderr: "" };
+    if (failedKinds.length === 0) {
+      return { exitCode: 0, stdout: "Logged out.\n", stderr: "" };
+    }
+
+    return {
+      exitCode: 1,
+      stdout: "",
+      stderr: `Logout incomplete. Failed to clear: ${failedKinds.join(", ")}\n`,
+    };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { exitCode: 1, stdout: "", stderr: `Failed: ${msg}\n` };

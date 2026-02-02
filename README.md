@@ -21,4 +21,9 @@ Useful commands:
 - `codex-usage status`
 - `codex-usage logout`
 
+Useful flags:
+- `--retry N` (retry on HTTP 5xx)
+- `--debug` (print status + header names on errors)
+- `--verbose` (include reset timestamps)
+
 This project was created using `bun init` in bun v1.3.4. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
