@@ -1,15 +1,26 @@
 {
   "name": "codex-usage",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Unofficial Bun-only CLI to display ChatGPT usage bars",
   "module": "src/cli.ts",
   "type": "module",
-  "private": true,
+  "license": "MIT",
   "bin": {
     "codex-usage": "src/cli.ts"
   },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "engines": {
+    "bun": ">=1.3.0"
+  },
   "scripts": {
     "test": "bun test",
-    "codex-usage": "bun ./src/cli.ts"
+    "codex-usage": "bun ./src/cli.ts",
+    "prepublishOnly": "bun test"
   },
   "devDependencies": {
     "@types/bun": "latest"

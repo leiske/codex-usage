@@ -1,16 +1,35 @@
 # codex-usage
 
-To install dependencies:
+Unofficial Bun-only CLI that reads the same internal usage endpoint the ChatGPT web UI uses and prints two usage bars (5-hour + Weekly).
+
+This can break at any time (internal endpoint / headers / Cloudflare). It never prints your raw cookies/tokens.
+
+## Install
+
+Requires Bun.
+
+Run without installing:
 
 ```bash
-bun install
+bunx codex-usage --help
 ```
 
-To run (Phase 2/3):
+Or install globally:
 
 ```bash
-cat curl.txt | bun run ./src/cli.ts import
-bun run ./src/cli.ts
+bun add -g codex-usage
+codex-usage --help
+```
+
+## Usage
+
+```bash
+# 1) In your browser DevTools Network tab, find the wham/usage request
+# 2) "Copy as cURL" and save it to curl.txt
+cat curl.txt | codex-usage import
+
+# Fetch and print usage bars
+codex-usage
 ```
 
 Storage:
@@ -26,4 +45,8 @@ Useful flags:
 - `--debug` (print status + header names on errors)
 - `--verbose` (include reset timestamps)
 
-This project was created using `bun init` in bun v1.3.4. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+## Publishing (maintainers)
+
+```bash
+bun publish
+```
