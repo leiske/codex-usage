@@ -19,7 +19,7 @@ async function writeAuthFile(path: string, token = "secret_token_value"): Promis
     {
       OPENAI_API_KEY: null,
       tokens: {
-        id_token: token,
+        access_token: token,
       },
       last_refresh: "2026-01-01T00:00:00.000Z",
     },
@@ -71,11 +71,15 @@ describe("run", () => {
     expect(result.stdout).toContain("1d 1h");
   });
 
-  test("prints auth expired on 403", async () => {
+  test("prints auth expired status and API code on 403", async () => {
     const authPath = tempAuthPath();
     await writeAuthFile(authPath, "token");
 
-    const fetchFn = async () => new Response("forbidden", { status: 403 });
+    const fetchFn = async () =>
+      new Response(JSON.stringify({ error: { code: "token_expired" } }), {
+        status: 403,
+        headers: { "content-type": "application/json" },
+      });
 
     const result = await run({
       argv: [],
@@ -89,6 +93,8 @@ describe("run", () => {
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("Auth expired.");
+    expect(result.stderr).toContain("HTTP 403");
+    expect(result.stderr).toContain("token_expired");
   });
 
   test("prints missing auth path when codex auth file is absent", async () => {

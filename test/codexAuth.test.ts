@@ -25,14 +25,14 @@ describe("codex auth", () => {
     expect(path).toBe("/home/me/.codex/auth.json");
   });
 
-  test("loads id_token and returns bearer header", async () => {
+  test("loads access_token and returns bearer header", async () => {
     const authPath = tempAuthPath();
     await mkdirpFor(authPath);
     await Bun.write(
       authPath,
       JSON.stringify({
         tokens: {
-          id_token: "token-123",
+          access_token: "token-123",
         },
       }),
     );
@@ -47,11 +47,11 @@ describe("codex auth", () => {
     await expect(loadCodexAuth({ authPath })).rejects.toThrow(authPath);
   });
 
-  test("throws when both codex tokens are missing", async () => {
+  test("throws when access_token is missing", async () => {
     const authPath = tempAuthPath();
     await mkdirpFor(authPath);
     await Bun.write(authPath, JSON.stringify({ tokens: {} }));
 
-    await expect(loadCodexAuth({ authPath })).rejects.toThrow("missing tokens.id_token or tokens.access_token");
+    await expect(loadCodexAuth({ authPath })).rejects.toThrow("missing tokens.access_token");
   });
 });

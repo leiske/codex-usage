@@ -26,16 +26,12 @@ export function getDefaultCodexAuthPath(env: CodexAuthEnv = Bun.env as CodexAuth
 function getTokenFromCodexAuth(data: unknown): string | null {
   const v = data as {
     tokens?: {
-      id_token?: unknown;
       access_token?: unknown;
     };
   };
 
   if (!v || typeof v !== "object") return null;
   if (!v.tokens || typeof v.tokens !== "object") return null;
-
-  const idToken = typeof v.tokens.id_token === "string" ? v.tokens.id_token.trim() : "";
-  if (idToken) return idToken;
 
   const accessToken = typeof v.tokens.access_token === "string" ? v.tokens.access_token.trim() : "";
   if (accessToken) return accessToken;
@@ -56,7 +52,7 @@ export async function loadCodexAuth(options: LoadCodexAuthOptions = {}): Promise
 
   const token = getTokenFromCodexAuth(data);
   if (!token) {
-    throw new Error(`Invalid Codex auth file at ${authPath}: missing tokens.id_token or tokens.access_token`);
+    throw new Error(`Invalid Codex auth file at ${authPath}: missing tokens.access_token`);
   }
 
   return {
