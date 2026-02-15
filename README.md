@@ -24,25 +24,15 @@ codex-usage --help
 ## Usage
 
 ```bash
-# 1) In your browser DevTools Network tab, find the wham/usage request
-# 2) "Copy as cURL" and save it to curl.txt
-cat curl.txt | codex-usage import
-
 # Fetch and print usage bars
 codex-usage
 ```
 
-Storage:
-- Phase 3 will prefer OS keychain (`secret-tool`), then `pass`, then an unencrypted file fallback.
-- File fallback path: `~/.config/codex-usage/auth.json` (chmod 600).
-
-Useful commands:
-- `codex-usage status`
-- `codex-usage logout`
+Auth source:
+- `CODEX_HOME/auth.json` when `CODEX_HOME` is set.
+- `~/.codex/auth.json` when `CODEX_HOME` is not set.
 
 Useful flags:
-- `--retry N` (retry on HTTP 5xx)
-- `--debug` (print status + header names on errors)
 - `--verbose` (include reset timestamps)
 
 ## Publishing (maintainers)

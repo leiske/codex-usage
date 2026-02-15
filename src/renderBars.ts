@@ -1,4 +1,3 @@
-import { UnexpectedResponseError } from "./errors";
 import { formatDuration } from "./time/formatDuration";
 import { formatLocalTimestamp } from "./time/formatLocalTimestamp";
 import { clampPercent, renderBar } from "./ui/bar";
@@ -24,16 +23,14 @@ function getWindow(data: unknown, key: "primary_window" | "secondary_window"): W
 }
 
 export type RenderBarsOptions = {
-  width?: number;
   columns?: number | null;
   verbose?: boolean;
   nowMs?: number;
 };
 
 export function renderBars(data: unknown, options: RenderBarsOptions = {}): string {
-  const preferred = options.width ?? 24;
   const columns = options.columns ?? null;
-  const width = computeBarWidth(columns, preferred);
+  const width = computeBarWidth(columns, 24);
   const verbose = options.verbose ?? false;
   const nowMs = options.nowMs ?? Date.now();
 
@@ -46,14 +43,10 @@ export function renderBars(data: unknown, options: RenderBarsOptions = {}): stri
   const sReset = numberFromUnknown(secondary.reset_after_seconds);
 
   if (pUsed === null || pReset === null) {
-    throw new UnexpectedResponseError(
-      "Unexpected JSON: missing rate_limit.primary_window.used_percent/reset_after_seconds",
-    );
+    throw new Error("Unexpected JSON: missing rate_limit.primary_window.used_percent/reset_after_seconds");
   }
   if (sUsed === null || sReset === null) {
-    throw new UnexpectedResponseError(
-      "Unexpected JSON: missing rate_limit.secondary_window.used_percent/reset_after_seconds",
-    );
+    throw new Error("Unexpected JSON: missing rate_limit.secondary_window.used_percent/reset_after_seconds");
   }
 
   const lines = [

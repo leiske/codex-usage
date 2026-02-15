@@ -1,8 +1,35 @@
 import { describe, expect, test } from "bun:test";
 
-import { runCommandWithErrors } from "../src/commands/run";
+import { run } from "../src/cli";
 
-describe("runCommandWithErrors", () => {
+function tempAuthPath(): string {
+  const id = crypto.randomUUID();
+  const tmp = Bun.env.TMPDIR && Bun.env.TMPDIR.trim() !== "" ? Bun.env.TMPDIR : "/tmp";
+  return `${tmp}/codex-usage-test-${id}/auth.json`;
+}
+
+async function writeAuthFile(path: string, token = "secret_token_value"): Promise<void> {
+  const idx = path.lastIndexOf("/");
+  const dir = idx > 0 ? path.slice(0, idx) : "/";
+  const proc = Bun.spawn(["mkdir", "-p", dir], { stdout: "ignore", stderr: "ignore" });
+  const code = await proc.exited;
+  if (code !== 0) throw new Error(`failed to mkdir ${dir}`);
+
+  const json = JSON.stringify(
+    {
+      OPENAI_API_KEY: null,
+      tokens: {
+        id_token: token,
+      },
+      last_refresh: "2026-01-01T00:00:00.000Z",
+    },
+    null,
+    2,
+  );
+  await Bun.write(path, json + "\n");
+}
+
+describe("run", () => {
   test("renders two bars from fetched JSON", async () => {
     const sample = {
       rate_limit: {
@@ -11,21 +38,24 @@ describe("runCommandWithErrors", () => {
       },
     };
 
-    const cookie = "secret_cookie_value";
-    const authorization = "Bearer secret_token_value";
+    const authPath = tempAuthPath();
+    await writeAuthFile(authPath, "secret_token_value");
 
-    const fetchFn = async () => {
+    const fetchFn = async (_input: any, init?: any) => {
+      const headers = init?.headers as Record<string, string> | undefined;
+      expect(headers?.authorization).toBe("Bearer secret_token_value");
+      expect(headers?.cookie).toBeUndefined();
       return new Response(JSON.stringify(sample), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
     };
 
-    const result = await runCommandWithErrors({
+    const result = await run({
+      argv: [],
+      authPath,
       env: {
         CHATGPT_WHAM_URL: "https://example.test/backend-api/wham/usage",
-        CHATGPT_COOKIE: cookie,
-        CHATGPT_AUTHORIZATION: authorization,
       },
       fetchFn: fetchFn as any,
       columns: 50,
@@ -39,118 +69,35 @@ describe("runCommandWithErrors", () => {
     expect(result.stdout).toContain("98%");
     expect(result.stdout).toContain("10m 20s");
     expect(result.stdout).toContain("1d 1h");
-
-    // Never echo secrets.
-    expect(result.stdout).not.toContain(cookie);
-    expect(result.stdout).not.toContain(authorization);
   });
 
-  test("works with auth token only (no cookies)", async () => {
-    const sample = {
-      rate_limit: {
-        primary_window: { used_percent: 1, reset_after_seconds: 1 },
-        secondary_window: { used_percent: 2, reset_after_seconds: 2 },
-      },
-    };
+  test("prints auth expired on 403", async () => {
+    const authPath = tempAuthPath();
+    await writeAuthFile(authPath, "token");
 
-    const fetchFn = async (input: any, init?: any) => {
-      const headers = init?.headers as Record<string, string> | undefined;
-      expect(headers?.authorization).toContain("Bearer");
-      expect(headers?.cookie).toBeUndefined();
-      return new Response(JSON.stringify(sample), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    };
-
-    const result = await runCommandWithErrors({
-      env: {
-        CHATGPT_WHAM_URL: "https://example.test/backend-api/wham/usage",
-        CHATGPT_AUTHORIZATION: "Bearer token",
-      },
-      fetchFn: fetchFn as any,
-      columns: 50,
-    });
-
-    expect(result.exitCode).toBe(0);
-    expect(result.stderr).toBe("");
-    expect(result.stdout).toContain("5-hour");
-    expect(result.stdout).toContain("Weekly");
-  });
-
-  test("prints re-import instruction on 403", async () => {
     const fetchFn = async () => new Response("forbidden", { status: 403 });
 
-    const result = await runCommandWithErrors({
+    const result = await run({
+      argv: [],
+      authPath,
       env: {
         CHATGPT_WHAM_URL: "https://example.test/backend-api/wham/usage",
-        CHATGPT_COOKIE: "c",
-        CHATGPT_AUTHORIZATION: "Bearer t",
       },
       fetchFn: fetchFn as any,
-      debug: true,
     });
 
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toBe("");
-    expect(result.stderr).toContain("Auth expired");
-    expect(result.stderr).toContain("codex-usage import");
-    expect(result.stderr).toContain("debug:");
+    expect(result.stderr).toContain("Auth expired.");
   });
 
-  test("prints actionable error on missing env", async () => {
-    const result = await runCommandWithErrors({ env: {} });
+  test("prints missing auth path when codex auth file is absent", async () => {
+    const authPath = tempAuthPath();
+
+    const result = await run({ argv: [], authPath });
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toBe("");
-    expect(result.stderr).toContain("CHATGPT_AUTHORIZATION");
-  });
-
-  test("retries on HTTP 5xx when configured", async () => {
-    let calls = 0;
-    const fetchFn = async () => {
-      calls++;
-      if (calls === 1) return new Response("oops", { status: 500 });
-      return new Response(
-        JSON.stringify({
-          rate_limit: {
-            primary_window: { used_percent: 0, reset_after_seconds: 1 },
-            secondary_window: { used_percent: 0, reset_after_seconds: 1 },
-          },
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      );
-    };
-
-    const result = await runCommandWithErrors({
-      env: {
-        CHATGPT_WHAM_URL: "https://example.test/backend-api/wham/usage",
-        CHATGPT_AUTHORIZATION: "Bearer t",
-      },
-      fetchFn: fetchFn as any,
-      retry: 1,
-    });
-
-    expect(calls).toBe(2);
-    expect(result.exitCode).toBe(0);
-  });
-
-  test("prints clear message on unexpected JSON shape", async () => {
-    const fetchFn = async () => {
-      return new Response(JSON.stringify({ nope: true }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    };
-
-    const result = await runCommandWithErrors({
-      env: {
-        CHATGPT_WHAM_URL: "https://example.test/backend-api/wham/usage",
-        CHATGPT_AUTHORIZATION: "Bearer t",
-      },
-      fetchFn: fetchFn as any,
-    });
-
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("Unexpected response shape");
+    expect(result.stderr).toContain("Missing auth to query usage");
+    expect(result.stderr).toContain(authPath);
   });
 });

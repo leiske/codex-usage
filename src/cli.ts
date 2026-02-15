@@ -1,10 +1,56 @@
 #!/usr/bin/env bun
 
-import { importCommandWithErrors } from "./commands/import";
-import { runStoredCommandWithErrors } from "./commands/runStored";
-import { storeStatusCommandWithErrors } from "./commands/storeStatus";
-import { logoutCommandWithErrors } from "./commands/logout";
-import { parseCliFlags } from "./cliFlags";
+import { loadCodexAuth } from "./auth/codexAuth";
+import { fetchUsage, type FetchFn } from "./fetchUsage";
+import { renderBars } from "./renderBars";
+import { getStdoutColumns } from "./ui/terminal";
+
+type CliFlags = {
+  help: boolean;
+  version: boolean;
+  verbose: boolean;
+};
+
+type CliResult = {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+};
+
+type RunOptions = {
+  argv?: string[];
+  env?: Record<string, string | undefined>;
+  fetchFn?: FetchFn;
+  authPath?: string;
+  columns?: number | null;
+};
+
+function parseCliFlags(argv: string[]): { flags: CliFlags; positionals: string[] } {
+  const flags: CliFlags = { help: false, version: false, verbose: false };
+  const positionals: string[] = [];
+
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+
+    if (a === "--verbose") {
+      flags.verbose = true;
+      continue;
+    }
+    if (a === "--help" || a === "-h") {
+      flags.help = true;
+      continue;
+    }
+    if (a === "--version" || a === "-v") {
+      flags.version = true;
+      continue;
+    }
+
+    if (a.startsWith("-")) continue;
+    positionals.push(a);
+  }
+
+  return { flags, positionals };
+}
 
 function helpText(): string {
   return [
@@ -13,85 +59,65 @@ function helpText(): string {
     "Usage:",
     "  codex-usage --help",
     "  codex-usage --version",
-    "  codex-usage                 # see usage",
-    "  codex-usage import          # read cURL from stdin and store auth",
-    "  codex-usage status          # show active auth storage",
-    "  codex-usage logout          # clear stored auth",
+    "  codex-usage",
     "",
     "Flags:",
-    "  --retry N     retry on HTTP 5xx (default 0)",
-    "  --debug       show status + header names on errors",
     "  --verbose     include reset timestamps",
     "",
     "Examples:",
-    "  cat curl.txt | codex-usage import",
-    "  pbpaste | codex-usage import # macOS",
-    "  xclip -o | codex-usage import  # Linux",
     "  codex-usage",
-    "  CHATGPT_AUTHORIZATION=... [CHATGPT_COOKIE=...] codex-usage",
+    "  CODEX_HOME=/path/to/.codex codex-usage",
   ].join("\n");
 }
 
-const argv = Bun.argv.slice(2);
-let parsed: ReturnType<typeof parseCliFlags>;
-try {
-  parsed = parseCliFlags(argv);
-} catch (err) {
-  const msg = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`Invalid args: ${msg}\n`);
-  process.stderr.write("Run: codex-usage --help\n");
-  process.exit(2);
+async function run(options: RunOptions = {}): Promise<CliResult> {
+  const argv = options.argv ?? Bun.argv.slice(2);
+  const parsed = parseCliFlags(argv);
+  const { flags, positionals } = parsed;
+
+  if (flags.version) {
+    const pkg = (await Bun.file(new URL("../package.json", import.meta.url)).json()) as { version?: string };
+    return { exitCode: 0, stdout: `${pkg.version ?? "0.0.0"}\n`, stderr: "" };
+  }
+
+  if (flags.help) {
+    return { exitCode: 0, stdout: `${helpText()}\n`, stderr: "" };
+  }
+
+  if (positionals.length > 0) {
+    return {
+      exitCode: 2,
+      stdout: "",
+      stderr: `Unknown command: ${positionals[0]}\nRun: codex-usage --help\n`,
+    };
+  }
+
+  const env = options.env ?? (Bun.env as Record<string, string | undefined>);
+  try {
+    const auth = await loadCodexAuth({ env, authPath: options.authPath });
+    const url = env.CHATGPT_WHAM_URL ?? "https://chatgpt.com/backend-api/wham/usage";
+    const usage = await fetchUsage({
+      url,
+      authorization: auth.authorization,
+      fetchFn: options.fetchFn,
+    });
+
+    const out = renderBars(usage, {
+      columns: options.columns ?? getStdoutColumns(),
+      verbose: flags.verbose,
+    });
+    return { exitCode: 0, stdout: `${out}\n`, stderr: "" };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { exitCode: 1, stdout: "", stderr: `${msg}\n` };
+  }
 }
 
-const { flags, positionals } = parsed;
-const cmd = positionals[0] ?? null;
-
-if (flags.version) {
-  const pkg = (await Bun.file(new URL("../package.json", import.meta.url)).json()) as {
-    version?: string;
-  };
-  process.stdout.write(`${pkg.version ?? "0.0.0"}\n`);
-  process.exit(0);
-}
-
-if (flags.help) {
-  process.stdout.write(helpText());
-  process.stdout.write("\n");
-  process.exit(0);
-}
-
-if (cmd === null) {
-  const result = await runStoredCommandWithErrors({
-    retry: flags.retry,
-    debug: flags.debug,
-    verbose: flags.verbose,
-  });
+if (import.meta.main) {
+  const result = await run();
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
   process.exit(result.exitCode);
 }
 
-if (cmd === "import") {
-  const result = await importCommandWithErrors();
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
-  process.exit(result.exitCode);
-}
-
-if (cmd === "status") {
-  const result = await storeStatusCommandWithErrors();
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
-  process.exit(result.exitCode);
-}
-
-if (cmd === "logout") {
-  const result = await logoutCommandWithErrors();
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
-  process.exit(result.exitCode);
-}
-
-process.stderr.write(`Unknown command: ${cmd}\n`);
-process.stderr.write("Run: codex-usage --help\n");
-process.exit(2);
+export { run };
