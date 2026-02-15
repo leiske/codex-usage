@@ -1,12 +1,24 @@
 # codex-usage
 
-Unofficial Bun-only CLI that reads the same internal usage endpoint the ChatGPT web UI uses and prints two usage bars (5-hour + Weekly).
+Unofficial CLI to report codex usage limits.
 
-This can break at any time (internal endpoint / headers / Cloudflare). It never prints your raw cookies/tokens.
+This can break at any time since it uses an internal API.
+
+## Usage
+
+```bash
+# Fetch and print usage bars
+> codex-usage
+
+5-hour [#-----------------------] 3% (resets in 3h 56m)
+Weekly [#-----------------------] 6% (resets in 3d 8h)
+```
+
+Auth source:
+- `CODEX_HOME/auth.json` when `CODEX_HOME` is set.
+- `~/.codex/auth.json` when `CODEX_HOME` is not set.
 
 ## Install
-
-Requires Bun.
 
 Run without installing:
 
@@ -20,20 +32,6 @@ Or install globally:
 bun add -g codex-usage
 codex-usage --help
 ```
-
-## Usage
-
-```bash
-# Fetch and print usage bars
-codex-usage
-```
-
-Auth source:
-- `CODEX_HOME/auth.json` when `CODEX_HOME` is set.
-- `~/.codex/auth.json` when `CODEX_HOME` is not set.
-
-Useful flags:
-- `--verbose` (include reset timestamps)
 
 ## Publishing (maintainers)
 
